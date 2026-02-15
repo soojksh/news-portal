@@ -38,8 +38,14 @@ export default async function ArticlePage({
       </header>
 
       {article.hero_image_url ? (
-        <Image src={article.hero_image_url} alt={article.title} className="w-full rounded-2xl border" width={800} height={400} />
-      ) : null}
+<Image
+  src={article.hero_image_url}
+  alt={article.title}
+  className="w-full rounded-2xl border"
+  width={800}
+  height={400}
+  unoptimized
+/>      ) : null}
 
       <StreamField blocks={article.body} />
     </main>

@@ -2,6 +2,8 @@
 
 import createDOMPurify from "dompurify";
 import { useMemo } from "react";
+import Image from "next/image";
+
 
 type StreamBlock =
   | { type: "heading"; value: string; id?: string }
@@ -48,11 +50,14 @@ export function StreamField({ blocks }: { blocks: StreamBlock[] }) {
           case "image":
             return (
               <figure key={key} className="space-y-2">
-                <img
-                  src={block.value.url}
-                  alt={block.value.alt || ""}
-                  className="w-full rounded-2xl border"
-                />
+                <Image
+  src={block.value.url}
+  alt={block.value.alt || ""}
+  className="w-full rounded-2xl border"
+  width={1200}
+  height={700}
+  unoptimized
+/>
                 {block.value.alt ? (
                   <figcaption className="text-sm opacity-70">{block.value.alt}</figcaption>
                 ) : null}

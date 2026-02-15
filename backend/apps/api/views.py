@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.conf import settings
+
 from typing import Any, Dict, List, Optional
 
 from rest_framework.response import Response
@@ -13,14 +15,18 @@ from apps.content.models import HomePage, SectionPage, ArticlePage
 
 
 def absolute_url(request, url: str) -> str:
-    """
-    Convert a relative media/path URL into an absolute URL so Next.js
-    can load it from Django (not from localhost:3000).
-    """
     if not url:
         return ""
     if url.startswith("http://") or url.startswith("https://"):
         return url
+
+    base = getattr(settings, "PUBLIC_BACKEND_BASE_URL", "").rstrip("/")
+    if base:
+        if not url.startswith("/"):
+            url = "/" + url
+        return f"{base}{url}"
+
+    # fallback
     return request.build_absolute_uri(url)
 
 

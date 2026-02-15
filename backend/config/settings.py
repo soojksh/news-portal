@@ -13,7 +13,7 @@ SECRET_KEY = 'django-insecure-#x%^pbw0)@^oi#^pqqg6l-m2)6@s**hp%=ih)bo=x*-adb)156
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -155,4 +155,10 @@ SPECTACULAR_SETTINGS = {
 
 
 WAGTAIL_SITE_NAME = "News Portal"
-WAGTAILADMIN_BASE_URL = "http://127.0.0.1:8000"
+WAGTAILADMIN_BASE_URL = "http://localhost:8000"
+PUBLIC_BACKEND_BASE_URL = "http://localhost:8000"
+
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
