@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "apps.news",
     "apps.media",
     "apps.analytics",
+    "apps.content",
 
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -149,3 +150,8 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "News Portal API",
     "VERSION": "1.0.0",
 }
+
+
+
+WAGTAIL_SITE_NAME = "News Portal"
+WAGTAILADMIN_BASE_URL = "http://127.0.0.1:8000"
