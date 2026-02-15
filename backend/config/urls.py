@@ -30,7 +30,7 @@ urlpatterns = [
     path("api/wagtail/", api_router.urls),
 
     # Custom DRF endpoints: /api/v1/...
-    # path("api/v1/", include("apps.api.urls")),
+    path("api/v1/", include("apps.api.urls")),
 
     # Wagtail page serving (optional; keep if you want Django to render pages too)
     path("", include(wagtail_urls)),

@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.media",
     "apps.analytics",
     "apps.content",
+    "apps.api",
 
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
