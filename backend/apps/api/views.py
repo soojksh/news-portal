@@ -1,26 +1,92 @@
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import CursorPagination
 
+from wagtail.images.models import Image as WagtailImage
+
 from apps.content.models import HomePage, SectionPage, ArticlePage
+
+
+def _hero_url(article: ArticlePage) -> str:
+    a = article.specific
+    return a.hero_image.file.url if getattr(a, "hero_image", None) else ""
 
 
 def article_to_card(article: ArticlePage) -> dict:
     a = article.specific
-    hero_url = a.hero_image.file.url if a.hero_image else ""
     return {
         "title": a.title,
         "slug": a.slug,
-        "subtitle": a.subtitle or "",
-        "excerpt": a.excerpt or "",
+        "subtitle": getattr(a, "subtitle", "") or "",
+        "excerpt": getattr(a, "excerpt", "") or "",
         "first_published_at": a.first_published_at,
-        "section": a.section_slug,
-        "hero_image_url": hero_url,
+        "section": getattr(a, "section_slug", "") or "",
+        "hero_image_url": _hero_url(a),
     }
 
 
+def resolve_streamfield_images(stream_data: Any) -> Any:
+    """
+    Convert StreamField blocks so React can render them easily.
+    Specifically transforms:
+      {"type": "image", "value": <image_id>}
+    into:
+      {"type": "image", "value": {"url": "...", "alt": "..."}}
+    """
+    if not isinstance(stream_data, list):
+        return stream_data
+
+    resolved: List[Dict[str, Any]] = []
+    for block in stream_data:
+        if not isinstance(block, dict) or "type" not in block:
+            resolved.append(block)
+            continue
+
+        btype = block.get("type")
+        val = block.get("value")
+
+        if btype == "image":
+            # Wagtail StreamField ImageChooserBlock usually stores an ID in `value`
+            image_id = None
+            if isinstance(val, int):
+                image_id = val
+            elif isinstance(val, dict) and "id" in val:
+                image_id = val.get("id")
+
+            if image_id:
+                img = WagtailImage.objects.filter(id=image_id).first()
+                if img:
+                    resolved.append({
+                        "type": "image",
+                        "value": {
+                            "url": img.file.url,
+                            "alt": img.title or "",
+                        }
+                    })
+                    continue
+
+            # fallback if missing
+            resolved.append({"type": "image", "value": {"url": "", "alt": ""}})
+            continue
+
+        # All other blocks pass through unchanged
+        resolved.append(block)
+
+    return resolved
+
+
 class HomeAPIView(APIView):
+    """
+    /api/v1/home/
+    Returns in one request:
+      - featured (curated in HomePage)
+      - latest (auto)
+    """
     def get(self, request):
         homepage = HomePage.objects.live().public().first()
         if not homepage:
@@ -29,7 +95,10 @@ class HomeAPIView(APIView):
         featured = []
         for item in homepage.featured_items.all():
             if item.article and item.article.live:
-                featured.append({**article_to_card(item.article), "label": item.label or ""})
+                featured.append({
+                    **article_to_card(item.article),
+                    "label": item.label or ""
+                })
 
         latest_qs = ArticlePage.objects.live().public().order_by("-first_published_at")[:12]
         latest = [article_to_card(a) for a in latest_qs]
@@ -43,6 +112,10 @@ class SectionFeedPagination(CursorPagination):
 
 
 class SectionFeedAPIView(ListAPIView):
+    """
+    /api/v1/sections/<slug>/
+    Cursor paginated section feed
+    """
     pagination_class = SectionFeedPagination
 
     def get_queryset(self):
@@ -51,7 +124,12 @@ class SectionFeedAPIView(ListAPIView):
         if not section:
             return ArticlePage.objects.none()
 
-        return ArticlePage.objects.live().public().descendant_of(section).order_by("-first_published_at")
+        return (
+            ArticlePage.objects.live()
+            .public()
+            .descendant_of(section)
+            .order_by("-first_published_at")
+        )
 
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset()
@@ -61,14 +139,20 @@ class SectionFeedAPIView(ListAPIView):
 
 
 class ArticleDetailAPIView(APIView):
+    """
+    /api/v1/articles/<slug>/
+    Detail endpoint with StreamField blocks resolved for React
+    """
     def get(self, request, slug):
         article = ArticlePage.objects.live().public().filter(slug=slug).first()
         if not article:
             return Response({"detail": "Article not found."}, status=404)
 
         a = article.specific
-        hero_url = a.hero_image.file.url if a.hero_image else ""
         tags = [t.name for t in a.tags.all()]
+        hero_url = _hero_url(a)
+
+        body = resolve_streamfield_images(a.body.get_prep_value())
 
         return Response({
             "title": a.title,
@@ -80,5 +164,5 @@ class ArticleDetailAPIView(APIView):
             "section": a.section_slug,
             "tags": tags,
             "hero_image_url": hero_url,
-            "body": a.body,  # StreamField JSON
+            "body": body,
         })
