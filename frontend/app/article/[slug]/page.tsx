@@ -1,3 +1,5 @@
+import Image from "next/image";
+import Link from "next/link";
 import { apiGet } from "@/lib/api";
 import { StreamField } from "@/components/StreamField";
 
@@ -25,9 +27,9 @@ export default async function ArticlePage({
 
   return (
     <main className="mx-auto max-w-3xl p-6 space-y-6">
-      <a href="/" className="text-sm opacity-70 hover:underline">
+      <Link href="/" className="text-sm opacity-70 hover:underline">
         ← Home
-      </a>
+      </Link>
 
       <header className="space-y-2">
         <div className="text-xs uppercase tracking-wide opacity-60">{article.section}</div>
@@ -36,7 +38,7 @@ export default async function ArticlePage({
       </header>
 
       {article.hero_image_url ? (
-        <img src={article.hero_image_url} alt={article.title} className="w-full rounded-2xl border" />
+        <Image src={article.hero_image_url} alt={article.title} className="w-full rounded-2xl border" width={800} height={400} />
       ) : null}
 
       <StreamField blocks={article.body} />

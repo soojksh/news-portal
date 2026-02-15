@@ -1,6 +1,7 @@
 "use client";
 
-import DOMPurify from "dompurify";
+import createDOMPurify from "dompurify";
+import { useMemo } from "react";
 
 type StreamBlock =
   | { type: "heading"; value: string; id?: string }
@@ -10,8 +11,19 @@ type StreamBlock =
   | { type: string; value: any; id?: string };
 
 function SafeHtml({ html }: { html: string }) {
+  const DOMPurify = useMemo(() => {
+    // create DOMPurify instance in browser
+    return createDOMPurify(window);
+  }, []);
+
   const clean = DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
-  return <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: clean }} />;
+
+  return (
+    <div
+      className="prose prose-lg max-w-none"
+      dangerouslySetInnerHTML={{ __html: clean }}
+    />
+  );
 }
 
 export function StreamField({ blocks }: { blocks: StreamBlock[] }) {
@@ -24,7 +36,11 @@ export function StreamField({ blocks }: { blocks: StreamBlock[] }) {
 
         switch (block.type) {
           case "heading":
-            return <h2 key={key} className="text-2xl font-semibold tracking-tight">{block.value}</h2>;
+            return (
+              <h2 key={key} className="text-2xl font-semibold tracking-tight">
+                {block.value}
+              </h2>
+            );
 
           case "paragraph":
             return <SafeHtml key={key} html={block.value} />;
@@ -33,7 +49,7 @@ export function StreamField({ blocks }: { blocks: StreamBlock[] }) {
             return (
               <figure key={key} className="space-y-2">
                 <img
-                  src={`${block.value.url}`}
+                  src={block.value.url}
                   alt={block.value.alt || ""}
                   className="w-full rounded-2xl border"
                 />
@@ -48,7 +64,9 @@ export function StreamField({ blocks }: { blocks: StreamBlock[] }) {
               <figure key={key} className="border-l-4 pl-4 italic">
                 <blockquote className="text-lg">{block.value.quote}</blockquote>
                 {block.value.attribution ? (
-                  <figcaption className="mt-2 text-sm not-italic opacity-70">— {block.value.attribution}</figcaption>
+                  <figcaption className="mt-2 text-sm not-italic opacity-70">
+                    — {block.value.attribution}
+                  </figcaption>
                 ) : null}
               </figure>
             );
