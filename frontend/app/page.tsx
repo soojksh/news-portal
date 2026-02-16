@@ -117,10 +117,6 @@ function SpotlightGrid({
 export default async function HomePage() {
   const data = await apiGet<HomeResponse>("/api/v1/home/");
 
-  /**
-   * Blend: Real API + demo.
-   * This preserves production behavior while keeping the UI “alive” during early development.
-   */
   const blendedLatest = uniqBySlug([...(data.latest ?? []), ...DEMO_ARTICLES]);
   const blendedFeatured = uniqBySlug([...(data.featured ?? []), ...DEMO_ARTICLES.slice(0, 4)]);
 
@@ -270,7 +266,7 @@ export default async function HomePage() {
           );
         })}
 
-        {/* ✅ Newsletter moved ABOVE Discover */}
+        {/*Newsletter    */}
         <NewsletterCard />
 
         {/* DISCOVER CAROUSEL */}
