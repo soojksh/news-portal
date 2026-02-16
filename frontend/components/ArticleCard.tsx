@@ -27,17 +27,20 @@ export function ArticleCard({
   label,
   variant = "default",
 }: ArticleCardProps) {
-  // Compact: no image, tight spacing, list-like
+  // Compact (list-style)
   if (variant === "compact") {
     return (
       <Link
         href={`/article/${slug}`}
-        className="group block rounded-2xl border bg-white/70 p-4 shadow-sm transition hover:bg-white hover:shadow-md"
+        className={cn(
+          "group block rounded-2xl bg-white/80 p-4 shadow-sm",
+          "transition hover:shadow-md hover:bg-white"
+        )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             {section ? (
-              <div className="text-[11px] uppercase tracking-wide text-black/55">
+              <div className="text-[11px] uppercase tracking-wide text-black/50">
                 {section}
               </div>
             ) : null}
@@ -47,14 +50,14 @@ export function ArticleCard({
             </div>
 
             {subtitle ? (
-              <div className="mt-1 line-clamp-1 text-xs text-black/65">
+              <div className="mt-1 line-clamp-1 text-xs text-black/60">
                 {subtitle}
               </div>
             ) : null}
           </div>
 
           {label ? (
-            <div className="shrink-0 rounded-full border bg-white px-2.5 py-1 text-[11px] font-semibold text-black/70">
+            <div className="shrink-0 rounded-full bg-black/5 px-2.5 py-1 text-[11px] font-semibold text-black/70">
               {label}
             </div>
           ) : null}
@@ -63,22 +66,26 @@ export function ArticleCard({
     );
   }
 
-  // Hero: bigger, image-first when available
+  // Hero (big visual)
   if (variant === "hero") {
     return (
       <Link
         href={`/article/${slug}`}
-        className="group block overflow-hidden rounded-3xl border bg-white shadow-sm transition hover:shadow-md"
+        className={cn(
+          "group block overflow-hidden rounded-3xl bg-white shadow-sm",
+          "transition hover:shadow-lg"
+        )}
       >
         {hero_image_url ? (
           <div className="relative">
             <img
               src={hero_image_url}
               alt={title}
-              className="h-64 w-full object-cover sm:h-72"
+              className="h-64 w-full object-cover sm:h-80"
               loading="lazy"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
+
             <div className="absolute left-4 top-4 flex items-center gap-2">
               {section ? (
                 <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-black">
@@ -86,11 +93,12 @@ export function ArticleCard({
                 </span>
               ) : null}
               {label ? (
-                <span className="rounded-full bg-black/70 px-3 py-1 text-[11px] font-semibold text-white">
+                <span className="rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white">
                   {label}
                 </span>
               ) : null}
             </div>
+
             <div className="absolute bottom-4 left-4 right-4">
               <div className="text-xl font-extrabold leading-tight text-white group-hover:underline sm:text-2xl">
                 {title}
@@ -98,6 +106,11 @@ export function ArticleCard({
               {subtitle ? (
                 <div className="mt-1 line-clamp-2 text-sm text-white/85">
                   {subtitle}
+                </div>
+              ) : null}
+              {excerpt ? (
+                <div className="mt-2 hidden sm:block line-clamp-2 text-sm text-white/75">
+                  {excerpt}
                 </div>
               ) : null}
             </div>
@@ -124,30 +137,23 @@ export function ArticleCard({
             ) : null}
           </div>
         )}
-
-        {/* If hero has no image, still show excerpt */}
-        {!hero_image_url && excerpt ? (
-          <div className="px-6 pb-6">
-            <div className="text-sm text-black/60 line-clamp-3">{excerpt}</div>
-          </div>
-        ) : null}
       </Link>
     );
   }
 
-  // Default: grid card
+  // Default grid card (no border)
   return (
     <Link
       href={`/article/${slug}`}
       className={cn(
-        "group block rounded-3xl border bg-white/70 p-5 shadow-sm transition",
-        "hover:bg-white hover:shadow-md"
+        "group block rounded-3xl bg-white/80 p-5 shadow-sm",
+        "transition hover:bg-white hover:shadow-md"
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           {section ? (
-            <div className="text-[11px] uppercase tracking-wide text-black/55">
+            <div className="text-[11px] uppercase tracking-wide text-black/50">
               {section}
             </div>
           ) : null}
@@ -164,14 +170,14 @@ export function ArticleCard({
         </div>
 
         {label ? (
-          <div className="shrink-0 rounded-full border bg-white px-3 py-1 text-[11px] font-semibold text-black/70">
+          <div className="shrink-0 rounded-full bg-black/5 px-3 py-1 text-[11px] font-semibold text-black/70">
             {label}
           </div>
         ) : null}
       </div>
 
       {hero_image_url ? (
-        <div className="mt-4 overflow-hidden rounded-2xl border bg-black/[0.02]">
+        <div className="mt-4 overflow-hidden rounded-2xl bg-black/[0.02]">
           <img
             src={hero_image_url}
             alt={title}

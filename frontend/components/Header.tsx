@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { DateConverter } from "@remotemerge/nepali-date-converter";
 
 type Lang = "en" | "ne";
 type NavItem = { key: "politics" | "business" | "sports"; href: string };
@@ -24,9 +25,7 @@ const I18N = {
     ad: "AD",
     bs: "BS",
     dtTitle: "Date & Time",
-    dtTitleNe: "मिति र समय",
-    notSupported: "BS calendar not supported here",
-    notSupportedNe: "BS क्यालेन्डर सपोर्ट छैन",
+    auto: "Auto",
   },
   ne: {
     politics: "राजनीति",
@@ -37,9 +36,7 @@ const I18N = {
     ad: "ई.सं.",
     bs: "वि.सं.",
     dtTitle: "मिति र समय",
-    dtTitleNe: "मिति र समय",
-    notSupported: "उपलब्ध छैन",
-    notSupportedNe: "उपलब्ध छैन",
+    auto: "स्वचालित",
   },
 } as const;
 
@@ -47,7 +44,7 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-// Convert 0-9 to Nepali digits (for nicer Nepali UI)
+// Convert 0-9 to Nepali digits for better Nepali UI
 function toNepaliDigits(input: string) {
   const map: Record<string, string> = {
     "0": "०",
@@ -64,51 +61,89 @@ function toNepaliDigits(input: string) {
   return input.replace(/[0-9]/g, (d) => map[d] ?? d);
 }
 
+const BS_MONTHS_NE = [
+  "बैशाख",
+  "जेठ",
+  "असार",
+  "श्रावण",
+  "भदौ",
+  "आश्विन",
+  "कार्तिक",
+  "मंसिर",
+  "पौष",
+  "माघ",
+  "फाल्गुन",
+  "चैत्र",
+];
+
+const BS_MONTHS_EN = [
+  "Baisakh",
+  "Jestha",
+  "Ashadh",
+  "Shrawan",
+  "Bhadra",
+  "Ashwin",
+  "Kartik",
+  "Mangsir",
+  "Poush",
+  "Magh",
+  "Falgun",
+  "Chaitra",
+];
+
+const WEEKDAY_NE: Record<string, string> = {
+  Sunday: "आइतबार",
+  Monday: "सोमबार",
+  Tuesday: "मंगलबार",
+  Wednesday: "बुधबार",
+  Thursday: "बिहीबार",
+  Friday: "शुक्रबार",
+  Saturday: "शनिबार",
+};
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
 /**
- * BS date formatting:
- * Try Intl with BS calendar, with a heuristic check to avoid "fake" BS fallbacks.
- * If unsupported, return null (UI shows a graceful message).
+ * BS conversion (AD -> BS) using a real converter library.
+ * Scientific note: Bikram Sambat does not have a simple arithmetic offset from AD,
+ * so we rely on a dataset-based converter to avoid incorrect dates.
  */
-function getBsIntl(d: Date, lang: Lang): { date: string; time: string } | null {
-  const tryLocales = [
-    "ne-NP-u-ca-bikram-sambat",
-    "ne-NP-u-ca-bikram",
-    "en-US-u-ca-bikram-sambat",
-    "en-GB-u-ca-bikram-sambat",
-  ];
+function getBs(d: Date, lang: Lang): { date: string; time: string } {
+  const y = d.getFullYear();
+  const m = pad2(d.getMonth() + 1);
+  const day = pad2(d.getDate());
+  const iso = `${y}-${m}-${day}`;
 
-  for (const locale of tryLocales) {
-    try {
-      const dateFmt = new Intl.DateTimeFormat(locale, {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
+  // Library returns structured BS components
+  const bs = new DateConverter(iso).toBs() as {
+    year: number;
+    month: number; // 1..12
+    date: number; // 1..32
+    day?: string; // e.g. "Monday"
+  };
 
-      const timeFmt = new Intl.DateTimeFormat(lang === "ne" ? "ne-NP" : "en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      });
+  const monthIdx = Math.max(1, Math.min(12, bs.month)) - 1;
+  const monthName = lang === "ne" ? BS_MONTHS_NE[monthIdx] : BS_MONTHS_EN[monthIdx];
+  const weekday = bs.day ? (lang === "ne" ? WEEKDAY_NE[bs.day] ?? bs.day : bs.day) : "";
 
-      const dateStr = dateFmt.format(d);
-      const timeStr = timeFmt.format(d);
+  // BS date string (readable, not ambiguous)
+  const dateStr =
+    lang === "ne"
+      ? `${weekday ? weekday + ", " : ""}${toNepaliDigits(String(bs.year))} ${monthName} ${toNepaliDigits(
+          String(bs.date)
+        )}`
+      : `${weekday ? weekday + ", " : ""}${bs.year} ${monthName} ${bs.date}`;
 
-      // Heuristic: BS year should differ significantly from AD year.
-      const yearMatch = dateStr.match(/(\d{4})/);
-      const y = yearMatch ? parseInt(yearMatch[1], 10) : NaN;
-      if (!Number.isFinite(y)) continue;
+  // Time (clock time is same local time; calendar changes, not clock)
+  const timeStr = new Intl.DateTimeFormat(lang === "ne" ? "ne-NP" : "en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
 
-      const diff = Math.abs(y - d.getFullYear());
-      if (diff < 30) continue; // likely not BS
-
-      return { date: dateStr, time: timeStr };
-    } catch {
-      // try next
-    }
-  }
-
-  return null;
+  return { date: dateStr, time: lang === "ne" ? toNepaliDigits(timeStr) : timeStr };
 }
 
 function formatAD(d: Date, lang: Lang) {
@@ -125,7 +160,10 @@ function formatAD(d: Date, lang: Lang) {
     hour12: false,
   }).format(d);
 
-  return { date, time };
+  return {
+    date: lang === "ne" ? toNepaliDigits(date) : date,
+    time: lang === "ne" ? toNepaliDigits(time) : time,
+  };
 }
 
 function useNow(tickMs = 1000) {
@@ -184,30 +222,30 @@ function useOutsideClose(open: boolean, onClose: () => void) {
 
 function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
   return (
-    <div className="inline-flex items-center rounded-full border bg-white/70 p-1 shadow-sm">
+    <div className="inline-flex items-center rounded-full bg-white/60 px-1 py-1 backdrop-blur">
       <button
         type="button"
         onClick={() => setLang("en")}
         className={cn(
-          "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-          lang === "en" ? "bg-black text-white" : "hover:bg-black/5 text-black/80"
+          "inline-flex items-center justify-center rounded-full px-3 py-2 text-sm transition",
+          lang === "en" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
         )}
         aria-label="Switch to English"
+        title="English"
       >
-        <span className="text-sm leading-none">🇺🇸</span>
-        <span className="hidden sm:inline">EN</span>
+        🇬🇧
       </button>
       <button
         type="button"
         onClick={() => setLang("ne")}
         className={cn(
-          "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-          lang === "ne" ? "bg-black text-white" : "hover:bg-black/5 text-black/80"
+          "inline-flex items-center justify-center rounded-full px-3 py-2 text-sm transition",
+          lang === "ne" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
         )}
         aria-label="Switch to Nepali"
+        title="नेपाली"
       >
-        <span className="text-sm leading-none">🇳🇵</span>
-        <span className="hidden sm:inline">ने</span>
+        🇳🇵
       </button>
     </div>
   );
@@ -219,12 +257,13 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
   const ref = useOutsideClose(open, () => setOpen(false));
 
   const ad = useMemo(() => formatAD(now, lang), [now, lang]);
-  const bs = useMemo(() => getBsIntl(now, lang), [now, lang]);
+  const bs = useMemo(() => getBs(now, lang), [now, lang]);
 
+  // Compact text shown on the pill
   const pillText = useMemo(() => {
-    const short = `${ad.date.split(",")[0]}, ${ad.date.split(" ").slice(0, 3).join(" ")} • ${ad.time}`;
-    return lang === "ne" ? toNepaliDigits(short) : short;
-  }, [ad.date, ad.time, lang]);
+    const short = `${ad.date.split(",")[0]} • ${ad.time}`;
+    return short;
+  }, [ad.date, ad.time]);
 
   return (
     <div ref={ref} className="relative">
@@ -232,9 +271,8 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "group inline-flex items-center gap-3 rounded-full border px-3 py-2 shadow-sm transition",
-          "bg-gradient-to-b from-white to-white/70 hover:from-white hover:to-white",
-          "backdrop-blur"
+          "group inline-flex items-center gap-3 rounded-full px-3 py-2 transition",
+          "bg-white/60 hover:bg-white/80 backdrop-blur"
         )}
         aria-label="Date and time (AD and BS)"
         aria-expanded={open}
@@ -245,12 +283,10 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
         </span>
 
         <div className="flex flex-col items-start leading-tight">
-          <div className="text-[10px] font-semibold tracking-wide uppercase opacity-70">
+          <div className="text-[10px] font-semibold tracking-wide uppercase text-black/60">
             {I18N[lang].today}
           </div>
-          <div className="text-xs font-semibold tabular-nums text-black/90">
-            {pillText}
-          </div>
+          <div className="text-xs font-semibold tabular-nums text-black/90">{pillText}</div>
         </div>
 
         <svg
@@ -258,7 +294,7 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
           height="16"
           viewBox="0 0 24 24"
           fill="none"
-          className={cn("opacity-70 transition", open ? "rotate-180" : "")}
+          className={cn("text-black/60 transition", open ? "rotate-180" : "")}
         >
           <path
             d="M6 9L12 15L18 9"
@@ -272,59 +308,41 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
 
       <div
         className={cn(
-          "absolute right-0 mt-2 w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border bg-white shadow-xl",
+          "absolute right-0 mt-2 w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white shadow-xl",
           "transition-[transform,opacity] duration-150 origin-top-right",
           open ? "opacity-100 scale-100" : "pointer-events-none opacity-0 scale-95"
         )}
       >
+        {/* Brand accent strip */}
         <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-red-600 to-black" />
 
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-bold tracking-tight text-black/90">
-              {lang === "ne" ? I18N[lang].dtTitleNe : I18N[lang].dtTitle}
-            </div>
-            <div className="text-[11px] opacity-60">{lang === "ne" ? "स्वचालित" : "Auto"}</div>
+            <div className="text-sm font-bold tracking-tight text-black/90">{I18N[lang].dtTitle}</div>
+            <div className="text-[11px] text-black/50">{I18N[lang].auto}</div>
           </div>
 
           <div className="grid gap-2">
-            <div className="rounded-xl border bg-black/[0.02] p-3">
+            <div className="rounded-xl bg-black/[0.03] p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-yellow-400" />
-                  <div className="text-[11px] font-semibold opacity-70">{I18N[lang].ad}</div>
+                  <div className="text-[11px] font-semibold text-black/60">{I18N[lang].ad}</div>
                 </div>
-                <div className="text-[11px] opacity-60 tabular-nums">
-                  {lang === "ne" ? toNepaliDigits(ad.time) : ad.time}
-                </div>
+                <div className="text-[11px] text-black/50 tabular-nums">{ad.time}</div>
               </div>
-              <div className="mt-1 text-sm font-semibold tabular-nums">
-                {lang === "ne" ? toNepaliDigits(ad.date) : ad.date}
-              </div>
+              <div className="mt-1 text-sm font-semibold tabular-nums text-black/90">{ad.date}</div>
             </div>
 
-            <div className="rounded-xl border bg-black/[0.02] p-3">
+            <div className="rounded-xl bg-black/[0.03] p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-red-600" />
-                  <div className="text-[11px] font-semibold opacity-70">{I18N[lang].bs}</div>
+                  <div className="text-[11px] font-semibold text-black/60">{I18N[lang].bs}</div>
                 </div>
-                <div className="text-[11px] opacity-60 tabular-nums">
-                  {bs ? bs.time : (lang === "ne" ? I18N[lang].notSupportedNe : I18N[lang].notSupported)}
-                </div>
+                <div className="text-[11px] text-black/50 tabular-nums">{bs.time}</div>
               </div>
-
-              <div className="mt-1 text-sm font-semibold tabular-nums">
-                {bs ? bs.date : (lang === "ne" ? "—" : "—")}
-              </div>
-
-              {!bs ? (
-                <div className="mt-2 text-[11px] opacity-60 leading-snug">
-                  {lang === "ne"
-                    ? "केही सिस्टममा BS Intl सपोर्ट हुँदैन। 100% सही BS का लागि हामी converter library जोड्छौं।"
-                    : "Some environments don’t support BS via Intl. For 100% accurate BS everywhere, we’ll add a converter library."}
-                </div>
-              ) : null}
+              <div className="mt-1 text-sm font-semibold tabular-nums text-black/90">{bs.date}</div>
             </div>
           </div>
         </div>
@@ -349,21 +367,21 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50">
-      {/* Brand accent strip (adds contrast; avoids pale look) */}
+      {/* Brand accent strip (adds contrast without shadows) */}
       <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-red-600 to-black" />
 
-      <div className="border-b bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70 shadow-[0_10px_30px_-20px_rgba(0,0,0,0.35)]">
+      <div className="border-b bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
         <div className="mx-auto max-w-6xl px-4">
           <div className="flex h-16 items-center justify-between gap-3">
-            {/* Logo: no box, no border — modern clean lockup */}
+            {/* Logo: bigger, clean (no box/border) */}
             <Link href="/" className="flex items-center">
               <Image
                 src="/logo.jpeg"
                 alt="Logo"
-                width={52}
-                height={52}
+                width={64}
+                height={64}
                 priority
-                className="h-11 w-11 sm:h-12 sm:w-12 object-contain"
+                className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
               />
             </Link>
 
@@ -378,9 +396,7 @@ export function Header() {
                     href={n.href}
                     className={cn(
                       "rounded-full px-4 py-2 text-sm font-semibold transition",
-                      active
-                        ? "bg-black text-white shadow-sm"
-                        : "text-black/85 hover:bg-black/5"
+                      active ? "bg-black text-white" : "text-black/85 hover:bg-black/5"
                     )}
                   >
                     {label}
@@ -396,13 +412,13 @@ export function Header() {
                 <DateTimeWidget lang={lang} />
               </div>
 
-              {/* Language toggle */}
+              {/* Language toggle (flag-only) */}
               <LangToggle lang={lang} setLang={setLang} />
 
-              {/* Search */}
+              {/* Search (clean pill, no border) */}
               <Link
                 href="/search"
-                className="hidden sm:inline-flex items-center rounded-full border bg-white/70 px-3 py-2 text-sm font-semibold shadow-sm hover:bg-black hover:text-white transition"
+                className="hidden sm:inline-flex items-center rounded-full bg-white/60 px-3 py-2 text-sm font-semibold text-black/80 backdrop-blur hover:bg-white/80 transition"
               >
                 {I18N[lang].search}
               </Link>
@@ -411,13 +427,18 @@ export function Header() {
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white/70 shadow-sm hover:bg-black/5 transition"
+                className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/60 backdrop-blur hover:bg-white/80 transition"
                 aria-label="Open menu"
                 aria-expanded={menuOpen}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="opacity-85">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-black/80">
                   {menuOpen ? (
-                    <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path
+                      d="M6 6L18 18M18 6L6 18"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
                   ) : (
                     <path
                       d="M4 7H20M4 12H20M4 17H20"
@@ -451,8 +472,8 @@ export function Header() {
                       key={n.href}
                       href={n.href}
                       className={cn(
-                        "rounded-2xl border px-4 py-3 text-sm font-semibold transition shadow-sm",
-                        active ? "bg-black text-white border-black" : "bg-white/80 hover:bg-black/5 text-black/85"
+                        "rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                        active ? "bg-black text-white" : "bg-white/60 hover:bg-white/80 text-black/85"
                       )}
                     >
                       {label}
@@ -462,14 +483,14 @@ export function Header() {
 
                 <Link
                   href="/search"
-                  className="rounded-2xl border px-4 py-3 text-sm font-semibold bg-white/80 hover:bg-black hover:text-white transition shadow-sm"
+                  className="rounded-2xl px-4 py-3 text-sm font-semibold bg-white/60 hover:bg-white/80 transition"
                 >
                   {I18N[lang].search}
                 </Link>
               </div>
 
-              {/* Subtle accent strip to keep the system cohesive */}
-              <div className="overflow-hidden rounded-2xl border">
+              {/* Small brand bars for mobile cohesion */}
+              <div className="overflow-hidden rounded-2xl bg-white/60">
                 <div className="h-1.5 w-full bg-yellow-400" />
                 <div className="h-1.5 w-full bg-red-600" />
                 <div className="h-1.5 w-full bg-black" />
