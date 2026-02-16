@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { DateConverter } from "@remotemerge/nepali-date-converter";
+import DateConverter from "@remotemerge/nepali-date-converter";
 
 type Lang = "en" | "ne";
 type NavItem = { key: "politics" | "business" | "sports"; href: string };
@@ -26,6 +26,7 @@ const I18N = {
     bs: "BS",
     dtTitle: "Date & Time",
     auto: "Auto",
+    searchPlaceholder: "Search news, topics, people…",
   },
   ne: {
     politics: "राजनीति",
@@ -37,6 +38,7 @@ const I18N = {
     bs: "वि.सं.",
     dtTitle: "मिति र समय",
     auto: "स्वचालित",
+    searchPlaceholder: "समाचार, विषय, व्यक्तिहरू खोज्नुहोस्…",
   },
 } as const;
 
@@ -44,7 +46,6 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-// Convert 0-9 to Nepali digits for better Nepali UI
 function toNepaliDigits(input: string) {
   const map: Record<string, string> = {
     "0": "०",
@@ -106,29 +107,23 @@ function pad2(n: number) {
 }
 
 /**
- * BS conversion (AD -> BS) using a real converter library.
- * Scientific note: Bikram Sambat does not have a simple arithmetic offset from AD,
- * so we rely on a dataset-based converter to avoid incorrect dates.
+ * BS conversion (AD -> BS) using a dataset-based converter.
+ * Note: BS conversion cannot be derived from a constant offset; it requires calendar mapping data.
  */
 function getBs(d: Date, lang: Lang): { date: string; time: string } {
-  const y = d.getFullYear();
-  const m = pad2(d.getMonth() + 1);
-  const day = pad2(d.getDate());
-  const iso = `${y}-${m}-${day}`;
+  const iso = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
-  // Library returns structured BS components
-  const bs = new DateConverter(iso).toBs() as {
+  const bs = new (DateConverter as any)(iso).toBs() as {
     year: number;
     month: number; // 1..12
     date: number; // 1..32
-    day?: string; // e.g. "Monday"
+    day?: string;
   };
 
   const monthIdx = Math.max(1, Math.min(12, bs.month)) - 1;
   const monthName = lang === "ne" ? BS_MONTHS_NE[monthIdx] : BS_MONTHS_EN[monthIdx];
   const weekday = bs.day ? (lang === "ne" ? WEEKDAY_NE[bs.day] ?? bs.day : bs.day) : "";
 
-  // BS date string (readable, not ambiguous)
   const dateStr =
     lang === "ne"
       ? `${weekday ? weekday + ", " : ""}${toNepaliDigits(String(bs.year))} ${monthName} ${toNepaliDigits(
@@ -136,7 +131,6 @@ function getBs(d: Date, lang: Lang): { date: string; time: string } {
         )}`
       : `${weekday ? weekday + ", " : ""}${bs.year} ${monthName} ${bs.date}`;
 
-  // Time (clock time is same local time; calendar changes, not clock)
   const timeStr = new Intl.DateTimeFormat(lang === "ne" ? "ne-NP" : "en-GB", {
     hour: "2-digit",
     minute: "2-digit",
@@ -228,24 +222,27 @@ function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
         onClick={() => setLang("en")}
         className={cn(
           "inline-flex items-center justify-center rounded-full px-3 py-2 text-sm transition",
-          lang === "en" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
+          // ✅ Active is gray (not black)
+          lang === "en" ? "bg-zinc-200 text-black" : "text-black/80 hover:bg-black/5"
         )}
         aria-label="Switch to English"
         title="English"
       >
-        🇬🇧
+        <Image src="/flags/gb.svg" alt="English" width={18} height={18} className="h-[18px] w-[18px] rounded-sm" />
       </button>
+
       <button
         type="button"
         onClick={() => setLang("ne")}
         className={cn(
           "inline-flex items-center justify-center rounded-full px-3 py-2 text-sm transition",
-          lang === "ne" ? "bg-black text-white" : "text-black/80 hover:bg-black/5"
+          // ✅ Active is gray (not black)
+          lang === "ne" ? "bg-zinc-200 text-black" : "text-black/80 hover:bg-black/5"
         )}
         aria-label="Switch to Nepali"
         title="नेपाली"
       >
-        🇳🇵
+        <Image src="/flags/np.svg" alt="नेपाली" width={18} height={18} className="h-[18px] w-[18px] rounded-sm" />
       </button>
     </div>
   );
@@ -259,11 +256,7 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
   const ad = useMemo(() => formatAD(now, lang), [now, lang]);
   const bs = useMemo(() => getBs(now, lang), [now, lang]);
 
-  // Compact text shown on the pill
-  const pillText = useMemo(() => {
-    const short = `${ad.date.split(",")[0]} • ${ad.time}`;
-    return short;
-  }, [ad.date, ad.time]);
+  const pillText = useMemo(() => `${ad.date.split(",")[0]} • ${ad.time}`, [ad.date, ad.time]);
 
   return (
     <div ref={ref} className="relative">
@@ -289,20 +282,8 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
           <div className="text-xs font-semibold tabular-nums text-black/90">{pillText}</div>
         </div>
 
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          className={cn("text-black/60 transition", open ? "rotate-180" : "")}
-        >
-          <path
-            d="M6 9L12 15L18 9"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={cn("text-black/60 transition", open ? "rotate-180" : "")}>
+          <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
@@ -313,9 +294,7 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
           open ? "opacity-100 scale-100" : "pointer-events-none opacity-0 scale-95"
         )}
       >
-        {/* Brand accent strip */}
         <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-red-600 to-black" />
-
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-sm font-bold tracking-tight text-black/90">{I18N[lang].dtTitle}</div>
@@ -351,13 +330,118 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
   );
 }
 
+/**
+ * Search banner (UI-only):
+ * - Opens when clicking Search button
+ * - Closes on ESC / outside click / close icon
+ * - We’ll wire it to /search results later
+ */
+function SearchBanner({
+  open,
+  onClose,
+  lang,
+}: {
+  open: boolean;
+  onClose: () => void;
+  lang: Lang;
+}) {
+  const ref = useOutsideClose(open, onClose);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [q, setQ] = useState("");
+
+  // Auto focus when opened
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [open]);
+
+  // ESC to close
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden transition-[max-height,opacity] duration-200",
+        open ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+      )}
+      aria-hidden={!open}
+    >
+      <div className="border-b bg-white/90 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-4 py-3">
+          <div ref={ref} className="flex items-center gap-3 rounded-2xl bg-black/[0.03] px-4 py-3">
+            {/* Search icon */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-black/60">
+              <path
+                d="M21 21L16.6 16.6M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+
+            <input
+              ref={inputRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={I18N[lang].searchPlaceholder}
+              className="w-full bg-transparent text-sm outline-none placeholder:text-black/40"
+            />
+
+            {/* UI-only: quick action button */}
+            <button
+              type="button"
+              className="rounded-xl bg-black px-3 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+              onClick={() => {
+                // UI only (no navigation yet)
+                // Next step: push to /search?q=...
+              }}
+            >
+              {I18N[lang].search}
+            </button>
+
+            {/* Close */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-black/5 transition"
+              aria-label="Close search"
+              title="Close"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-black/70">
+                <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="mt-2 text-[11px] text-black/50">
+            Tip: Press <span className="font-semibold">Esc</span> to close.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [lang, setLang] = useLocalStorageState<Lang>("npw_lang", "en");
 
+  // ✅ Search UI state
+  const [searchOpen, setSearchOpen] = useState(false);
+
   useEffect(() => {
+    // Close menus on route change
     setMenuOpen(false);
+    setSearchOpen(false);
   }, [pathname]);
 
   const activeHref = useMemo(() => {
@@ -367,25 +451,22 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50">
-      {/* Brand accent strip (adds contrast without shadows) */}
       <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-red-600 to-black" />
 
       <div className="border-b bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
         <div className="mx-auto max-w-6xl px-4">
           <div className="flex h-16 items-center justify-between gap-3">
-            {/* Logo: bigger, clean (no box/border) */}
             <Link href="/" className="flex items-center">
               <Image
                 src="/logo.jpeg"
                 alt="Logo"
-                width={64}
-                height={64}
+                width={72}
+                height={72}
                 priority
                 className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
               />
             </Link>
 
-            {/* Desktop nav */}
             <nav className="hidden md:flex items-center gap-1">
               {NAV.map((n) => {
                 const active = activeHref === n.href;
@@ -405,25 +486,27 @@ export function Header() {
               })}
             </nav>
 
-            {/* Right side actions */}
             <div className="flex items-center gap-2">
-              {/* Date/time widget */}
               <div className="hidden sm:block">
                 <DateTimeWidget lang={lang} />
               </div>
 
-              {/* Language toggle (flag-only) */}
               <LangToggle lang={lang} setLang={setLang} />
 
-              {/* Search (clean pill, no border) */}
-              <Link
-                href="/search"
-                className="hidden sm:inline-flex items-center rounded-full bg-white/60 px-3 py-2 text-sm font-semibold text-black/80 backdrop-blur hover:bg-white/80 transition"
+              {/* ✅ Search button now toggles the search banner (UI only) */}
+              <button
+                type="button"
+                onClick={() => setSearchOpen((v) => !v)}
+                className={cn(
+                  "hidden sm:inline-flex items-center rounded-full bg-white/60 px-3 py-2 text-sm font-semibold text-black/80 backdrop-blur transition",
+                  "hover:bg-white/80"
+                )}
+                aria-label="Open search"
+                aria-expanded={searchOpen}
               >
                 {I18N[lang].search}
-              </Link>
+              </button>
 
-              {/* Mobile menu */}
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
@@ -433,69 +516,62 @@ export function Header() {
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-black/80">
                   {menuOpen ? (
-                    <path
-                      d="M6 6L18 18M18 6L6 18"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
+                    <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   ) : (
-                    <path
-                      d="M4 7H20M4 12H20M4 17H20"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
+                    <path d="M4 7H20M4 12H20M4 17H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   )}
                 </svg>
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Mobile dropdown */}
-          <div
-            className={cn(
-              "md:hidden overflow-hidden transition-[max-height,opacity] duration-200",
-              menuOpen ? "max-h-[680px] opacity-100" : "max-h-0 opacity-0"
-            )}
+        {/* ✅ Search banner appears below the header row */}
+        <SearchBanner open={searchOpen} onClose={() => setSearchOpen(false)} lang={lang} />
+      </div>
+
+      {/* Mobile dropdown */}
+      <div
+        className={cn(
+          "md:hidden overflow-hidden transition-[max-height,opacity] duration-200",
+          menuOpen ? "max-h-[680px] opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <div className="mx-auto max-w-6xl px-4 pb-4 pt-3 space-y-3 bg-white/85 backdrop-blur border-b">
+          <DateTimeWidget lang={lang} />
+
+          {/* Mobile search button (opens the same banner) */}
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="w-full rounded-2xl bg-white/60 px-4 py-3 text-sm font-semibold text-black/85 hover:bg-white/80 transition text-left"
           >
-            <div className="pb-4 pt-3 space-y-3">
-              {/* Date/Time on mobile */}
-              <DateTimeWidget lang={lang} />
+            {I18N[lang].search}
+          </button>
 
-              <div className="grid gap-2">
-                {NAV.map((n) => {
-                  const active = activeHref === n.href;
-                  const label = I18N[lang][n.key];
-                  return (
-                    <Link
-                      key={n.href}
-                      href={n.href}
-                      className={cn(
-                        "rounded-2xl px-4 py-3 text-sm font-semibold transition",
-                        active ? "bg-black text-white" : "bg-white/60 hover:bg-white/80 text-black/85"
-                      )}
-                    >
-                      {label}
-                    </Link>
-                  );
-                })}
-
+          <div className="grid gap-2">
+            {NAV.map((n) => {
+              const active = activeHref === n.href;
+              const label = I18N[lang][n.key];
+              return (
                 <Link
-                  href="/search"
-                  className="rounded-2xl px-4 py-3 text-sm font-semibold bg-white/60 hover:bg-white/80 transition"
+                  key={n.href}
+                  href={n.href}
+                  className={cn(
+                    "rounded-2xl px-4 py-3 text-sm font-semibold transition",
+                    active ? "bg-black text-white" : "bg-white/60 hover:bg-white/80 text-black/85"
+                  )}
                 >
-                  {I18N[lang].search}
+                  {label}
                 </Link>
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Small brand bars for mobile cohesion */}
-              <div className="overflow-hidden rounded-2xl bg-white/60">
-                <div className="h-1.5 w-full bg-yellow-400" />
-                <div className="h-1.5 w-full bg-red-600" />
-                <div className="h-1.5 w-full bg-black" />
-              </div>
-            </div>
+          <div className="overflow-hidden rounded-2xl bg-white/60">
+            <div className="h-1.5 w-full bg-yellow-400" />
+            <div className="h-1.5 w-full bg-red-600" />
+            <div className="h-1.5 w-full bg-black" />
           </div>
         </div>
       </div>
