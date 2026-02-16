@@ -2,12 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DateConverter from "@remotemerge/nepali-date-converter";
 
 type Lang = "en" | "ne";
 type NavItem = { key: "politics" | "business" | "sports"; href: string };
+
+type SearchDoc = {
+  title: string;
+  slug: string;
+  subtitle?: string;
+  excerpt?: string;
+  section?: string;
+  hero_image_url?: string;
+};
 
 const NAV: NavItem[] = [
   { key: "politics", href: "/section/politics" },
@@ -27,6 +36,9 @@ const I18N = {
     dtTitle: "Date & Time",
     auto: "Auto",
     searchPlaceholder: "Search news, topics, people…",
+    searching: "Searching…",
+    suggestions: "Suggestions",
+    noSuggestions: "No suggestions",
   },
   ne: {
     politics: "राजनीति",
@@ -39,6 +51,9 @@ const I18N = {
     dtTitle: "मिति र समय",
     auto: "स्वचालित",
     searchPlaceholder: "समाचार, विषय, व्यक्तिहरू खोज्नुहोस्…",
+    searching: "खोज्दै…",
+    suggestions: "सुझाव",
+    noSuggestions: "कुनै सुझाव छैन",
   },
 } as const;
 
@@ -222,7 +237,6 @@ function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
         onClick={() => setLang("en")}
         className={cn(
           "inline-flex items-center justify-center rounded-full px-3 py-2 text-sm transition",
-          // ✅ Active is gray (not black)
           lang === "en" ? "bg-zinc-200 text-black" : "text-black/80 hover:bg-black/5"
         )}
         aria-label="Switch to English"
@@ -236,7 +250,6 @@ function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
         onClick={() => setLang("ne")}
         className={cn(
           "inline-flex items-center justify-center rounded-full px-3 py-2 text-sm transition",
-          // ✅ Active is gray (not black)
           lang === "ne" ? "bg-zinc-200 text-black" : "text-black/80 hover:bg-black/5"
         )}
         aria-label="Switch to Nepali"
@@ -282,8 +295,20 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
           <div className="text-xs font-semibold tabular-nums text-black/90">{pillText}</div>
         </div>
 
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className={cn("text-black/60 transition", open ? "rotate-180" : "")}>
-          <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          className={cn("text-black/60 transition", open ? "rotate-180" : "")}
+        >
+          <path
+            d="M6 9L12 15L18 9"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
 
@@ -330,11 +355,42 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
   );
 }
 
+/** Tiny scoring for suggestions (no backend changes). */
+function scoreDoc(q: string, d: SearchDoc) {
+  const query = q.trim().toLowerCase();
+  if (!query) return 0;
+
+  const title = (d.title || "").toLowerCase();
+  const sub = (d.subtitle || "").toLowerCase();
+  const exc = (d.excerpt || "").toLowerCase();
+  const sec = (d.section || "").toLowerCase();
+
+  let score = 0;
+
+  if (title === query) score += 200;
+  if (title.startsWith(query)) score += 120;
+  if (title.includes(query)) score += 80;
+
+  if (sub.includes(query)) score += 25;
+  if (exc.includes(query)) score += 15;
+  if (sec.includes(query)) score += 10;
+
+  // Token bonus (handles multi-word queries)
+  const tokens = query.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    const hay = `${title} ${sub} ${exc} ${sec}`;
+    const hit = tokens.reduce((acc, t) => (hay.includes(t) ? acc + 1 : acc), 0);
+    score += hit * 12;
+  }
+
+  return score;
+}
+
 /**
- * Search banner (UI-only):
- * - Opens when clicking Search button
- * - Closes on ESC / outside click / close icon
- * - We’ll wire it to /search results later
+ * Search banner (smart UI, zero backend changes)
+ * - Prefetches a lightweight index from existing endpoints (home + top sections)
+ * - Shows suggestions while typing
+ * - Navigates to /search?q=... on submit
  */
 function SearchBanner({
   open,
@@ -345,14 +401,19 @@ function SearchBanner({
   onClose: () => void;
   lang: Lang;
 }) {
+  const router = useRouter();
   const ref = useOutsideClose(open, onClose);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [q, setQ] = useState("");
 
-  // Auto focus when opened
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [docs, setDocs] = useState<SearchDoc[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Focus on open
   useEffect(() => {
     if (!open) return;
-    const t = setTimeout(() => inputRef.current?.focus(), 50);
+    const t = setTimeout(() => inputRef.current?.focus(), 60);
     return () => clearTimeout(t);
   }, [open]);
 
@@ -366,63 +427,206 @@ function SearchBanner({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Prefetch a small search index ONCE per session (smart + fast).
+  useEffect(() => {
+    if (!open) return;
+    if (hydrated) return;
+
+    let alive = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+
+        // Existing endpoints only (no backend changes):
+        // - home gives latest + featured
+        // - sections give first page for each section
+        const endpoints = [
+          "/api/v1/home/",
+          "/api/v1/sections/politics/",
+          "/api/v1/sections/business/",
+          "/api/v1/sections/sports/",
+        ];
+
+        const res = await Promise.all(
+          endpoints.map((p) =>
+            fetch(p, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+          )
+        );
+
+        if (!alive) return;
+
+        const home = res[0] as any;
+        const secPol = res[1] as any;
+        const secBiz = res[2] as any;
+        const secSpo = res[3] as any;
+
+        const pack: SearchDoc[] = [];
+
+        // home.latest + home.featured
+        for (const a of (home?.latest ?? []) as any[]) {
+          pack.push({
+            title: a.title,
+            slug: a.slug,
+            subtitle: a.subtitle,
+            excerpt: a.excerpt,
+            section: a.section,
+            hero_image_url: a.hero_image_url,
+          });
+        }
+        for (const a of (home?.featured ?? []) as any[]) {
+          pack.push({
+            title: a.title,
+            slug: a.slug,
+            subtitle: a.subtitle,
+            excerpt: a.excerpt,
+            section: a.section,
+            hero_image_url: a.hero_image_url,
+          });
+        }
+
+        // section feeds: results[]
+        for (const a of (secPol?.results ?? []) as any[]) pack.push(a);
+        for (const a of (secBiz?.results ?? []) as any[]) pack.push(a);
+        for (const a of (secSpo?.results ?? []) as any[]) pack.push(a);
+
+        // Deduplicate by slug
+        const seen = new Set<string>();
+        const uniq = pack.filter((d) => {
+          if (!d?.slug) return false;
+          if (seen.has(d.slug)) return false;
+          seen.add(d.slug);
+          return true;
+        });
+
+        setDocs(uniq);
+        setHydrated(true);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [open, hydrated]);
+
+  const suggestions = useMemo(() => {
+    const query = q.trim();
+    if (!query) return [];
+    return docs
+      .map((d) => ({ d, s: scoreDoc(query, d) }))
+      .filter((x) => x.s > 0)
+      .sort((a, b) => b.s - a.s)
+      .slice(0, 6)
+      .map((x) => x.d);
+  }, [q, docs]);
+
+  function submit(nextQ?: string) {
+    const query = (nextQ ?? q).trim();
+    if (!query) return;
+    onClose();
+    router.push(`/search?q=${encodeURIComponent(query)}`);
+  }
+
   return (
     <div
       className={cn(
         "overflow-hidden transition-[max-height,opacity] duration-200",
-        open ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+        open ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
       )}
       aria-hidden={!open}
     >
       <div className="border-b bg-white/90 backdrop-blur">
         <div className="mx-auto max-w-6xl px-4 py-3">
-          <div ref={ref} className="flex items-center gap-3 rounded-2xl bg-black/[0.03] px-4 py-3">
-            {/* Search icon */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-black/60">
-              <path
-                d="M21 21L16.6 16.6M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-
-            <input
-              ref={inputRef}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={I18N[lang].searchPlaceholder}
-              className="w-full bg-transparent text-sm outline-none placeholder:text-black/40"
-            />
-
-            {/* UI-only: quick action button */}
-            <button
-              type="button"
-              className="rounded-xl bg-black px-3 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
-              onClick={() => {
-                // UI only (no navigation yet)
-                // Next step: push to /search?q=...
-              }}
-            >
-              {I18N[lang].search}
-            </button>
-
-            {/* Close */}
-            <button
-              type="button"
-              onClick={onClose}
-              className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-black/5 transition"
-              aria-label="Close search"
-              title="Close"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-black/70">
-                <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <div ref={ref} className="space-y-2">
+            <div className="flex items-center gap-3 rounded-2xl bg-black/[0.03] px-4 py-3">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-black/60">
+                <path
+                  d="M21 21L16.6 16.6M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
               </svg>
-            </button>
-          </div>
 
-          <div className="mt-2 text-[11px] text-black/50">
-            Tip: Press <span className="font-semibold">Esc</span> to close.
+              <input
+                ref={inputRef}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                }}
+                placeholder={I18N[lang].searchPlaceholder}
+                className="w-full bg-transparent text-sm outline-none placeholder:text-black/40"
+              />
+
+              <button
+                type="button"
+                className="rounded-xl bg-black px-3 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+                onClick={() => submit()}
+              >
+                {I18N[lang].search}
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="ml-1 inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-black/5 transition"
+                aria-label="Close search"
+                title="Close"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-black/70">
+                  <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Suggestions */}
+            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2">
+                <div className="text-[11px] font-extrabold uppercase tracking-wide text-black/50">
+                  {I18N[lang].suggestions}
+                </div>
+                <div className="text-[11px] text-black/45">
+                  {loading ? I18N[lang].searching : " "}
+                </div>
+              </div>
+
+              <div className="divide-y">
+                {q.trim() && suggestions.length ? (
+                  suggestions.map((s) => (
+                    <button
+                      key={s.slug}
+                      type="button"
+                      onClick={() => submit(s.title)}
+                      className="w-full text-left px-4 py-3 hover:bg-black/[0.03] transition"
+                    >
+                      <div className="text-sm font-semibold text-black/90 line-clamp-1">
+                        {s.title}
+                      </div>
+                      <div className="mt-1 text-xs text-black/55 flex items-center gap-2">
+                        {s.section ? (
+                          <span className="rounded-full bg-black/[0.04] px-2 py-0.5">
+                            {s.section}
+                          </span>
+                        ) : null}
+                        {s.subtitle ? <span className="line-clamp-1">{s.subtitle}</span> : null}
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-3 text-sm text-black/55">
+                    {q.trim() ? I18N[lang].noSuggestions : I18N[lang].searchPlaceholder}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="text-[11px] text-black/45">
+              Tip: Press <span className="font-semibold">Enter</span> to search •{" "}
+              <span className="font-semibold">Esc</span> to close.
+            </div>
           </div>
         </div>
       </div>
@@ -435,7 +639,6 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [lang, setLang] = useLocalStorageState<Lang>("npw_lang", "en");
 
-  // ✅ Search UI state
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -493,7 +696,7 @@ export function Header() {
 
               <LangToggle lang={lang} setLang={setLang} />
 
-              {/* ✅ Search button now toggles the search banner (UI only) */}
+              {/* Search toggles banner */}
               <button
                 type="button"
                 onClick={() => setSearchOpen((v) => !v)}
@@ -526,7 +729,7 @@ export function Header() {
           </div>
         </div>
 
-        {/* ✅ Search banner appears below the header row */}
+        {/* Search banner under header row */}
         <SearchBanner open={searchOpen} onClose={() => setSearchOpen(false)} lang={lang} />
       </div>
 
@@ -540,7 +743,6 @@ export function Header() {
         <div className="mx-auto max-w-6xl px-4 pb-4 pt-3 space-y-3 bg-white/85 backdrop-blur border-b">
           <DateTimeWidget lang={lang} />
 
-          {/* Mobile search button (opens the same banner) */}
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
