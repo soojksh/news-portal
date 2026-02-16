@@ -97,7 +97,7 @@ export default async function SearchPage({
     ...(politics.results ?? []),
     ...(business.results ?? []),
     ...(sports.results ?? []),
-    ...DEMO_ARTICLES, // keeps demo content available too
+    ...DEMO_ARTICLES, 
   ]);
 
   const filteredPool = sectionFilter
@@ -145,7 +145,7 @@ export default async function SearchPage({
           </Link>
         </div>
 
-        {/* Quick section chips (pure frontend filter via querystring) */}
+        {/* Quick section chips */}
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href={q ? `/search?q=${encodeURIComponent(q)}` : "/search"}

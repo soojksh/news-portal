@@ -134,7 +134,7 @@ export default async function HomePage() {
         {/* HERO FEATURED */}
         {blendedFeatured.length ? (
           <section className="space-y-4">
-            <SectionHeading title="Top Stories" subtitle="Curated + live feed blend" />
+            <SectionHeading title="Top Stories"  />
 
             <div className="grid gap-5 lg:grid-cols-12">
               <div className="lg:col-span-7">
@@ -173,7 +173,7 @@ export default async function HomePage() {
         {/* LATEST + TRENDING + ADS */}
         <section className="grid gap-10 lg:grid-cols-12">
           <div className="lg:col-span-8 space-y-4">
-            <SectionHeading title="Latest" subtitle="Fresh updates (real + demo blend)" />
+            <SectionHeading title="Latest"  />
 
             <div className="grid gap-5 sm:grid-cols-2">
               {blendedLatest.slice(0, 8).map((a) => (
@@ -188,7 +188,7 @@ export default async function HomePage() {
           </div>
 
           <aside className="lg:col-span-4 space-y-4">
-            <SectionHeading title="Trending" subtitle="MVP list (analytics later)" />
+            <SectionHeading title="Trending"  />
 
             <div className="rounded-3xl bg-white/70 p-4 shadow-sm">
               <ol className="space-y-3">
@@ -271,7 +271,7 @@ export default async function HomePage() {
 
         {/* DISCOVER CAROUSEL */}
         <section className="space-y-4">
-          <SectionHeading title="Discover" subtitle="Swipe to browse quickly" />
+          <SectionHeading title="Discover" />
 
           <Carousel>
             {blendedLatest.slice(0, 14).map((a) => (
