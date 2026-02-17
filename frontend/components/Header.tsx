@@ -33,7 +33,8 @@ const I18N = {
     today: "Today",
     ad: "AD",
     bs: "BS",
-    dtTitle: "Date & Time",
+    dtTitle: "Date",
+    timeTitle: "Time",
     auto: "Auto",
     searchPlaceholder: "Search news, topics, people…",
     searching: "Searching…",
@@ -48,7 +49,8 @@ const I18N = {
     today: "आज",
     ad: "ई.सं.",
     bs: "वि.सं.",
-    dtTitle: "मिति र समय",
+    dtTitle: "मिति",
+    timeTitle: "समय",
     auto: "स्वचालित",
     searchPlaceholder: "समाचार, विषय, व्यक्तिहरू खोज्नुहोस्…",
     searching: "खोज्दै…",
@@ -149,6 +151,7 @@ function getBs(d: Date, lang: Lang): { date: string; time: string } {
   const timeStr = new Intl.DateTimeFormat(lang === "ne" ? "ne-NP" : "en-GB", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).format(d);
 
@@ -157,15 +160,16 @@ function getBs(d: Date, lang: Lang): { date: string; time: string } {
 
 function formatAD(d: Date, lang: Lang) {
   const date = new Intl.DateTimeFormat(lang === "ne" ? "ne-NP" : "en-GB", {
-    weekday: "short",
+    weekday: "long",
     day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric",
   }).format(d);
 
   const time = new Intl.DateTimeFormat(lang === "ne" ? "ne-NP" : "en-GB", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).format(d);
 
@@ -229,6 +233,49 @@ function useOutsideClose(open: boolean, onClose: () => void) {
   return ref;
 }
 
+function IconClock(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M12 6v6l4 2"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconCalendar(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M7 3v2M17 3v2M4 8h16"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6 5h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M8 12h3M8 16h3M13 12h3M13 16h3"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
   return (
     <div className="inline-flex items-center rounded-full bg-white/60 px-1 py-1 backdrop-blur">
@@ -242,7 +289,13 @@ function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
         aria-label="Switch to English"
         title="English"
       >
-        <Image src="/flags/gb.svg" alt="English" width={18} height={18} className="h-[18px] w-[18px] rounded-sm" />
+        <Image
+          src="/flags/gb.svg"
+          alt="English"
+          width={18}
+          height={18}
+          className="h-[18px] w-[18px] rounded-sm"
+        />
       </button>
 
       <button
@@ -255,13 +308,26 @@ function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void 
         aria-label="Switch to Nepali"
         title="नेपाली"
       >
-        <Image src="/flags/np.svg" alt="नेपाली" width={18} height={18} className="h-[18px] w-[18px] rounded-sm" />
+        <Image
+          src="/flags/np.svg"
+          alt="नेपाली"
+          width={18}
+          height={18}
+          className="h-[18px] w-[18px] rounded-sm"
+        />
       </button>
     </div>
   );
 }
 
-function DateTimeWidget({ lang }: { lang: Lang }) {
+/**
+ * ✅ New: Split Date + Time UI
+ * - Time is always visible, live with seconds.
+ * - Date opens a dropdown that shows AD and BS dates (with time).
+ * - Uses clock + calendar icons.
+ * - No red live dot.
+ */
+function DateTimeSplit({ lang }: { lang: Lang }) {
   const now = useNow(1000);
   const [open, setOpen] = useState(false);
   const ref = useOutsideClose(open, () => setOpen(false));
@@ -269,84 +335,119 @@ function DateTimeWidget({ lang }: { lang: Lang }) {
   const ad = useMemo(() => formatAD(now, lang), [now, lang]);
   const bs = useMemo(() => getBs(now, lang), [now, lang]);
 
-  const pillText = useMemo(() => `${ad.date.split(",")[0]} • ${ad.time}`, [ad.date, ad.time]);
+  const timeText = ad.time; // already 24h with seconds
+  const datePillText = useMemo(() => {
+    // short pill label (weekday + dd MMM)
+    const short = new Intl.DateTimeFormat(lang === "ne" ? "ne-NP" : "en-GB", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+    }).format(now);
+
+    return lang === "ne" ? toNepaliDigits(short) : short;
+  }, [now, lang]);
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "group inline-flex items-center gap-3 rounded-full px-3 py-2 transition",
-          "bg-white/60 hover:bg-white/80 backdrop-blur"
-        )}
-        aria-label="Date and time (AD and BS)"
-        aria-expanded={open}
-      >
-        <span className="relative flex h-2.5 w-2.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500/35" />
-          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
-        </span>
-
-        <div className="flex flex-col items-start leading-tight">
-          <div className="text-[10px] font-semibold tracking-wide uppercase text-black/60">
-            {I18N[lang].today}
-          </div>
-          <div className="text-xs font-semibold tabular-nums text-black/90">{pillText}</div>
-        </div>
-
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          className={cn("text-black/60 transition", open ? "rotate-180" : "")}
-        >
-          <path
-            d="M6 9L12 15L18 9"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-
+    <div className="hidden sm:flex items-center gap-2">
+      {/* Time pill */}
       <div
         className={cn(
-          "absolute right-0 mt-2 w-[340px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white shadow-xl",
-          "transition-[transform,opacity] duration-150 origin-top-right",
-          open ? "opacity-100 scale-100" : "pointer-events-none opacity-0 scale-95"
+          "inline-flex items-center gap-2 rounded-full px-3 py-2",
+          "bg-white/60 backdrop-blur hover:bg-white/80 transition"
         )}
+        aria-label="Live time"
+        title={I18N[lang].timeTitle}
       >
-        <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-red-600 to-black" />
-        <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-bold tracking-tight text-black/90">{I18N[lang].dtTitle}</div>
-            <div className="text-[11px] text-black/50">{I18N[lang].auto}</div>
+        <IconClock className="h-4 w-4 text-black/60" />
+        <div className="flex flex-col leading-tight">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-black/50">
+            {/* {I18N[lang].timeTitle} */}
+          </div>
+          <div className="text-xs font-extrabold tabular-nums text-black/90">{timeText}</div>
+        </div>
+      </div>
+
+      {/* Date dropdown */}
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className={cn(
+            "group inline-flex items-center gap-2 rounded-full px-3 py-2 transition",
+            "bg-white/60 hover:bg-white/80 backdrop-blur"
+          )}
+          aria-label="Open date dropdown"
+          aria-expanded={open}
+          title={I18N[lang].dtTitle}
+        >
+          <IconCalendar className="h-4 w-4 text-black/60" />
+          <div className="flex flex-col items-start leading-tight">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-black/50">
+              {/* {I18N[lang].dtTitle} */}
+            </div>
+            <div className="text-xs font-extrabold text-black/90">{datePillText}</div>
           </div>
 
-          <div className="grid gap-2">
-            <div className="rounded-xl bg-black/[0.03] p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-yellow-400" />
-                  <div className="text-[11px] font-semibold text-black/60">{I18N[lang].ad}</div>
-                </div>
-                <div className="text-[11px] text-black/50 tabular-nums">{ad.time}</div>
-              </div>
-              <div className="mt-1 text-sm font-semibold tabular-nums text-black/90">{ad.date}</div>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            className={cn("text-black/60 transition", open ? "rotate-180" : "")}
+          >
+            <path
+              d="M6 9L12 15L18 9"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <div
+          className={cn(
+            "absolute right-0 mt-2 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white shadow-xl",
+            "transition-[transform,opacity] duration-150 origin-top-right",
+            open ? "opacity-100 scale-100" : "pointer-events-none opacity-0 scale-95"
+          )}
+        >
+          <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-red-600 to-black" />
+
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-extrabold tracking-tight text-black/90">{I18N[lang].today}</div>
+              <div className="text-[11px] text-black/45">{I18N[lang].auto}</div>
             </div>
 
-            <div className="rounded-xl bg-black/[0.03] p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-red-600" />
-                  <div className="text-[11px] font-semibold text-black/60">{I18N[lang].bs}</div>
+            <div className="grid gap-2">
+              {/* AD */}
+              <div className="rounded-2xl bg-black/[0.03] p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-yellow-400" />
+                    <div className="text-[11px] font-semibold text-black/60">{I18N[lang].ad}</div>
+                  </div>
+                  <div className="text-[11px] text-black/50 tabular-nums">{ad.time}</div>
                 </div>
-                <div className="text-[11px] text-black/50 tabular-nums">{bs.time}</div>
+                <div className="mt-1 text-sm font-semibold tabular-nums text-black/90">{ad.date}</div>
               </div>
-              <div className="mt-1 text-sm font-semibold tabular-nums text-black/90">{bs.date}</div>
+
+              {/* BS */}
+              <div className="rounded-2xl bg-black/[0.03] p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-red-600" />
+                    <div className="text-[11px] font-semibold text-black/60">{I18N[lang].bs}</div>
+                  </div>
+                  <div className="text-[11px] text-black/50 tabular-nums">{bs.time}</div>
+                </div>
+                <div className="mt-1 text-sm font-semibold tabular-nums text-black/90">{bs.date}</div>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-black/45">
+              Tip: Press <span className="font-semibold">Esc</span> to close.
             </div>
           </div>
         </div>
@@ -375,7 +476,6 @@ function scoreDoc(q: string, d: SearchDoc) {
   if (exc.includes(query)) score += 15;
   if (sec.includes(query)) score += 10;
 
-  // Token bonus (handles multi-word queries)
   const tokens = query.split(/\s+/).filter(Boolean);
   if (tokens.length > 1) {
     const hay = `${title} ${sub} ${exc} ${sec}`;
@@ -386,12 +486,6 @@ function scoreDoc(q: string, d: SearchDoc) {
   return score;
 }
 
-/**
- * Search banner (smart UI, zero backend changes)
- * - Prefetches a lightweight index from existing endpoints (home + top sections)
- * - Shows suggestions while typing
- * - Navigates to /search?q=... on submit
- */
 function SearchBanner({
   open,
   onClose,
@@ -410,14 +504,12 @@ function SearchBanner({
   const [docs, setDocs] = useState<SearchDoc[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
-  // Focus on open
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => inputRef.current?.focus(), 60);
     return () => clearTimeout(t);
   }, [open]);
 
-  // ESC to close
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -427,7 +519,6 @@ function SearchBanner({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Prefetch a small search index ONCE per session (smart + fast).
   useEffect(() => {
     if (!open) return;
     if (hydrated) return;
@@ -438,9 +529,6 @@ function SearchBanner({
       try {
         setLoading(true);
 
-        // Existing endpoints only (no backend changes):
-        // - home gives latest + featured
-        // - sections give first page for each section
         const endpoints = [
           "/api/v1/home/",
           "/api/v1/sections/politics/",
@@ -449,9 +537,12 @@ function SearchBanner({
         ];
 
         const res = await Promise.all(
-          endpoints.map((p) =>
-            fetch(p, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
-          )
+          endpoints
+            .map((p) =>
+              fetch(p, { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .catch(() => null)
+            )
         );
 
         if (!alive) return;
@@ -463,7 +554,6 @@ function SearchBanner({
 
         const pack: SearchDoc[] = [];
 
-        // home.latest + home.featured
         for (const a of (home?.latest ?? []) as any[]) {
           pack.push({
             title: a.title,
@@ -485,12 +575,10 @@ function SearchBanner({
           });
         }
 
-        // section feeds: results[]
         for (const a of (secPol?.results ?? []) as any[]) pack.push(a);
         for (const a of (secBiz?.results ?? []) as any[]) pack.push(a);
         for (const a of (secSpo?.results ?? []) as any[]) pack.push(a);
 
-        // Deduplicate by slug
         const seen = new Set<string>();
         const uniq = pack.filter((d) => {
           if (!d?.slug) return false;
@@ -582,15 +670,12 @@ function SearchBanner({
               </button>
             </div>
 
-            {/* Suggestions */}
             <div className="rounded-2xl bg-white shadow-sm ring-1 ring-black/5 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2">
                 <div className="text-[11px] font-extrabold uppercase tracking-wide text-black/50">
                   {I18N[lang].suggestions}
                 </div>
-                <div className="text-[11px] text-black/45">
-                  {loading ? I18N[lang].searching : " "}
-                </div>
+                <div className="text-[11px] text-black/45">{loading ? I18N[lang].searching : " "}</div>
               </div>
 
               <div className="divide-y">
@@ -602,14 +687,10 @@ function SearchBanner({
                       onClick={() => submit(s.title)}
                       className="w-full text-left px-4 py-3 hover:bg-black/[0.03] transition"
                     >
-                      <div className="text-sm font-semibold text-black/90 line-clamp-1">
-                        {s.title}
-                      </div>
+                      <div className="text-sm font-semibold text-black/90 line-clamp-1">{s.title}</div>
                       <div className="mt-1 text-xs text-black/55 flex items-center gap-2">
                         {s.section ? (
-                          <span className="rounded-full bg-black/[0.04] px-2 py-0.5">
-                            {s.section}
-                          </span>
+                          <span className="rounded-full bg-black/[0.04] px-2 py-0.5">{s.section}</span>
                         ) : null}
                         {s.subtitle ? <span className="line-clamp-1">{s.subtitle}</span> : null}
                       </div>
@@ -642,7 +723,6 @@ export function Header() {
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
-    // Close menus on route change
     setMenuOpen(false);
     setSearchOpen(false);
   }, [pathname]);
@@ -690,13 +770,11 @@ export function Header() {
             </nav>
 
             <div className="flex items-center gap-2">
-              <div className="hidden sm:block">
-                <DateTimeWidget lang={lang} />
-              </div>
+              {/* ✅ New split Date/Time UI */}
+              <DateTimeSplit lang={lang} />
 
               <LangToggle lang={lang} setLang={setLang} />
 
-              {/* Search toggles banner */}
               <button
                 type="button"
                 onClick={() => setSearchOpen((v) => !v)}
@@ -729,11 +807,9 @@ export function Header() {
           </div>
         </div>
 
-        {/* Search banner under header row */}
         <SearchBanner open={searchOpen} onClose={() => setSearchOpen(false)} lang={lang} />
       </div>
 
-      {/* Mobile dropdown */}
       <div
         className={cn(
           "md:hidden overflow-hidden transition-[max-height,opacity] duration-200",
@@ -741,7 +817,10 @@ export function Header() {
         )}
       >
         <div className="mx-auto max-w-6xl px-4 pb-4 pt-3 space-y-3 bg-white/85 backdrop-blur border-b">
-          <DateTimeWidget lang={lang} />
+          {/* Mobile: keep the date dropdown only (compact) */}
+          <div className="sm:hidden">
+            <DateTimeSplit lang={lang} />
+          </div>
 
           <button
             type="button"
