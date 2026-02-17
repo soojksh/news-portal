@@ -1,0 +1,352 @@
+/* ==========================================================================
+   The Nepal Wire — Wagtail Admin Theme (Wagtail 7.3+)
+   Strategy:
+   1) Override Wagtail design tokens (CSS variables) to kill default purple
+   2) Apply a few high-specificity rules to sidebar/header/nav/buttons
+   ========================================================================== */
+
+/* -----------------------------
+   0) Brand tokens
+   ----------------------------- */
+:root {
+  --npw-yellow: #facc15;
+  --npw-red: #dc2626;
+  --npw-black: #0b0f19;
+
+  --npw-bg: #f6f7fb;
+  --npw-surface: #ffffff;
+  --npw-surface-2: rgba(255, 255, 255, 0.78);
+
+  --npw-text: #111827;
+  --npw-muted: rgba(17, 24, 39, 0.62);
+  --npw-border: rgba(17, 24, 39, 0.12);
+
+  --npw-radius-lg: 18px;
+  --npw-radius-md: 14px;
+
+  --npw-shadow-sm: 0 8px 24px -18px rgba(0, 0, 0, 0.28);
+  --npw-shadow-md: 0 18px 44px -28px rgba(0, 0, 0, 0.35);
+
+  --npw-focus: 0 0 0 3px rgba(220, 38, 38, 0.18);
+}
+
+/* -----------------------------
+   1) IMPORTANT: Override Wagtail tokens (kills purple)
+   These are what Wagtail 7.3 uses for color theming.
+   ----------------------------- */
+:root,
+html,
+body {
+  /* Core palette */
+  --w-color-primary: var(--npw-black) !important;       /* primary UI accents */
+  --w-color-primary-100: rgba(11, 15, 25, 0.10) !important;
+  --w-color-primary-200: rgba(11, 15, 25, 0.16) !important;
+  --w-color-primary-500: var(--npw-black) !important;
+
+  --w-color-secondary: var(--npw-red) !important;       /* secondary highlights */
+  --w-color-secondary-500: var(--npw-red) !important;
+
+  /* Surfaces */
+  --w-color-surface: var(--npw-surface) !important;
+  --w-color-surface-page: var(--npw-bg) !important;
+  --w-color-border-furniture: var(--npw-border) !important;
+
+  /* Text */
+  --w-color-text: var(--npw-text) !important;
+  --w-color-text-context: var(--npw-muted) !important;
+
+  /* Links */
+  --w-color-link: var(--npw-red) !important;
+  --w-color-link-hover: #b91c1c !important;
+
+  /* Focus */
+  --w-color-focus: rgba(220, 38, 38, 0.30) !important;
+}
+
+/* Background / typography smoothing */
+html,
+body {
+  background: var(--npw-bg) !important;
+  color: var(--npw-text) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* -----------------------------
+   2) Top header — clean newsroom bar + brand strip
+   ----------------------------- */
+header.w-header,
+.w-header {
+  background: var(--npw-surface-2) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--npw-border) !important;
+  box-shadow: var(--npw-shadow-sm) !important;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+header.w-header::before,
+.w-header::before {
+  content: "";
+  display: block;
+  height: 4px;
+  background: linear-gradient(90deg, var(--npw-yellow), var(--npw-red), var(--npw-black));
+}
+
+/* Make header text less “default admin” */
+header.w-header h1,
+header.w-header .w-header__help,
+header.w-header a {
+  color: var(--npw-text) !important;
+}
+
+/* -----------------------------
+   3) Left navigation — modern dark sidebar (not purple)
+   This is what your screenshot shows as purple.
+   ----------------------------- */
+.w-sidenav,
+.w-sidebar,
+.sidebar {
+  background: linear-gradient(180deg, #0b0f19 0%, #0a1022 100%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Add a thin brand strip inside sidebar (editorial feel) */
+.w-sidenav::before,
+.w-sidebar::before,
+.sidebar::before {
+  content: "";
+  display: block;
+  height: 4px;
+  background: linear-gradient(90deg, var(--npw-yellow), var(--npw-red), var(--npw-black));
+}
+
+/* Sidebar icons/text color */
+.w-sidenav,
+.w-sidenav * ,
+.w-sidebar,
+.w-sidebar * {
+  color: rgba(255, 255, 255, 0.88) !important;
+}
+
+/* Sidebar search input (left) */
+.w-sidenav input[type="search"],
+.w-sidebar input[type="search"],
+.sidebar input[type="search"] {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  border-radius: 14px !important;
+}
+
+.w-sidenav input[type="search"]::placeholder,
+.w-sidebar input[type="search"]::placeholder {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+/* Sidebar menu links — “pill” hover */
+.w-sidenav a,
+.w-sidebar a,
+.sidebar a {
+  border-radius: 14px !important;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.w-sidenav a:hover,
+.w-sidebar a:hover {
+  background: rgba(250, 204, 21, 0.10) !important; /* subtle brand yellow */
+  transform: translateY(-1px);
+}
+
+/* Active item — use brand red indicator */
+.w-sidenav .w-sidenav__item--active > a,
+.w-sidebar .w-menu__item--active > a,
+.sidebar .sidebar-menu__item--active > a,
+.w-sidenav a[aria-current="page"] {
+  background: rgba(220, 38, 38, 0.18) !important;
+  border: 1px solid rgba(220, 38, 38, 0.22) !important;
+}
+
+/* -----------------------------
+   4) Main content cards/panels — modern white “newsroom panels”
+   ----------------------------- */
+.w-panel,
+.panel,
+.w-card,
+.card,
+.w-summary,
+.w-help-block {
+  background: var(--npw-surface) !important;
+  border: 1px solid var(--npw-border) !important;
+  border-radius: var(--npw-radius-lg) !important;
+  box-shadow: var(--npw-shadow-sm) !important;
+}
+
+/* Panel header */
+.w-panel__heading,
+.panel__heading,
+.w-panel__header {
+  border-bottom: 1px solid var(--npw-border) !important;
+  padding: 14px 16px !important;
+}
+
+.w-panel__content,
+.panel__content {
+  padding: 16px !important;
+}
+
+/* Page title (The Nepal Wire) should look more like a brand heading */
+.w-breadcrumb,
+.w-page-title,
+.w-header__title,
+h1 {
+  letter-spacing: -0.02em;
+}
+
+/* -----------------------------
+   5) Buttons — strong editorial primary
+   ----------------------------- */
+button,
+.button,
+a.button,
+input[type="submit"],
+input[type="button"] {
+  border-radius: 14px !important;
+  font-weight: 800 !important;
+  transition: transform 120ms ease, opacity 120ms ease, box-shadow 120ms ease;
+}
+
+.button.button-primary,
+a.button.button-primary,
+button.button.button-primary,
+input[type="submit"] {
+  background: var(--npw-black) !important;
+  border-color: var(--npw-black) !important;
+  color: #fff !important;
+  box-shadow: var(--npw-shadow-sm) !important;
+}
+
+.button.button-primary:hover,
+a.button.button-primary:hover,
+button.button.button-primary:hover,
+input[type="submit"]:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.button:not(.button-primary),
+a.button:not(.button-primary),
+button.button:not(.button-primary),
+input[type="button"] {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid var(--npw-border) !important;
+  color: var(--npw-text) !important;
+}
+
+.button:not(.button-primary):hover,
+a.button:not(.button-primary):hover {
+  background: rgba(17, 24, 39, 0.05) !important;
+  transform: translateY(-1px);
+}
+
+/* Destructive */
+.button--warning,
+.button.button--warning,
+button.button--warning {
+  background: var(--npw-red) !important;
+  border-color: var(--npw-red) !important;
+  color: #fff !important;
+}
+
+/* -----------------------------
+   6) Forms — rounded newsroom inputs + red focus
+   ----------------------------- */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+textarea,
+select {
+  border-radius: 14px !important;
+  border: 1px solid var(--npw-border) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: var(--npw-text) !important;
+  box-shadow: none !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: rgba(220, 38, 38, 0.55) !important;
+  box-shadow: var(--npw-focus) !important;
+}
+
+/* -----------------------------
+   7) Listings / tables — calmer, scannable
+   ----------------------------- */
+.listing,
+table.listing {
+  background: var(--npw-surface) !important;
+  border: 1px solid var(--npw-border) !important;
+  border-radius: var(--npw-radius-lg) !important;
+  overflow: hidden !important;
+  box-shadow: var(--npw-shadow-sm) !important;
+}
+
+.listing thead th,
+table.listing thead th {
+  background: rgba(17, 24, 39, 0.03) !important;
+  color: rgba(17, 24, 39, 0.78) !important;
+  font-weight: 900 !important;
+  border-bottom: 1px solid var(--npw-border) !important;
+}
+
+.listing tbody tr:hover,
+table.listing tbody tr:hover {
+  background: rgba(250, 204, 21, 0.10) !important; /* editorial hover */
+}
+
+/* Status pills */
+.status-tag,
+.w-status,
+.w-tag {
+  border-radius: 999px !important;
+  font-weight: 800 !important;
+}
+
+/* -----------------------------
+   8) Messages / alerts
+   ----------------------------- */
+.messages,
+.w-messages {
+  border-radius: var(--npw-radius-lg) !important;
+  overflow: hidden;
+}
+
+.w-messages .success {
+  background: rgba(16, 185, 129, 0.12) !important;
+  border-left: 4px solid rgba(16, 185, 129, 0.9) !important;
+}
+
+.w-messages .warning {
+  background: rgba(250, 204, 21, 0.15) !important;
+  border-left: 4px solid rgba(250, 204, 21, 0.95) !important;
+}
+
+.w-messages .error {
+  background: rgba(220, 38, 38, 0.12) !important;
+  border-left: 4px solid rgba(220, 38, 38, 0.95) !important;
+}
+
+/* -----------------------------
+   9) Reduce motion if user prefers
+   ----------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
