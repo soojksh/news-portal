@@ -1,0 +1,119 @@
+{# Newsroom dashboard panel (Wagtail admin home) #}
+
+<section class="npw-dashboard">
+  <div class="npw-dashboard__top">
+    <div class="npw-kpis">
+      <div class="npw-kpi">
+        <div class="npw-kpi__label">Published today</div>
+        <div class="npw-kpi__value">{{ kpi.published_today }}</div>
+      </div>
+      <div class="npw-kpi">
+        <div class="npw-kpi__label">Live content</div>
+        <div class="npw-kpi__value">{{ kpi.total_live }}</div>
+      </div>
+      <div class="npw-kpi">
+        <div class="npw-kpi__label">Drafts</div>
+        <div class="npw-kpi__value">{{ kpi.total_drafts }}</div>
+      </div>
+      <div class="npw-kpi">
+        <div class="npw-kpi__label">Images</div>
+        <div class="npw-kpi__value">{{ kpi.image_count }}</div>
+      </div>
+      <div class="npw-kpi">
+        <div class="npw-kpi__label">Documents</div>
+        <div class="npw-kpi__value">{{ kpi.doc_count }}</div>
+      </div>
+    </div>
+
+    <div class="npw-actions">
+      <div class="npw-actions__title">Quick actions</div>
+      <div class="npw-actions__grid">
+        {% for a in actions %}
+          <a class="npw-action" href="{{ a.href }}">
+            <div class="npw-action__icon" data-icon="{{ a.icon }}"></div>
+            <div class="npw-action__text">
+              <div class="npw-action__label">{{ a.label }}</div>
+              <div class="npw-action__desc">{{ a.desc }}</div>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="npw-dashboard__bottom">
+    <div class="npw-panel">
+      <div class="npw-panel__head">
+        <div class="npw-panel__title">Recent drafts</div>
+        <div class="npw-panel__meta">Fast access to unfinished work</div>
+      </div>
+
+      <div class="npw-list">
+        {% for p in recent_drafts %}
+          <a class="npw-list__row" href="/cms/pages/{{ p.id }}/edit/">
+            <div class="npw-list__title">{{ p.title }}</div>
+            <div class="npw-list__right">
+              {% if p.latest_revision_created_at %}
+                <span class="npw-pill">Updated</span>
+              {% else %}
+                <span class="npw-pill npw-pill--muted">Draft</span>
+              {% endif %}
+            </div>
+          </a>
+        {% empty %}
+          <div class="npw-empty">No drafts found.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="npw-panel">
+      <div class="npw-panel__head">
+        <div class="npw-panel__title">Scheduled</div>
+        <div class="npw-panel__meta">Upcoming go-live items</div>
+      </div>
+
+      <div class="npw-list">
+        {% for p in scheduled %}
+          <a class="npw-list__row" href="/cms/pages/{{ p.id }}/edit/">
+            <div class="npw-list__title">{{ p.title }}</div>
+            <div class="npw-list__right">
+              <span class="npw-pill npw-pill--warn">
+                {{ p.go_live_at|date:"M d, H:i" }}
+              </span>
+            </div>
+          </a>
+        {% empty %}
+          <div class="npw-empty">No scheduled items.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="npw-panel">
+      <div class="npw-panel__head">
+        <div class="npw-panel__title">Review queue</div>
+        <div class="npw-panel__meta">
+          {% if workflow_enabled %}Workflow in progress{% else %}Enable workflows later for approvals{% endif %}
+        </div>
+      </div>
+
+      <div class="npw-list">
+        {% if workflow_enabled %}
+          {% for w in workflow_items %}
+            <a class="npw-list__row" href="/cms/pages/{{ w.page.id }}/edit/">
+              <div class="npw-list__title">{{ w.page.title }}</div>
+              <div class="npw-list__right">
+                <span class="npw-pill npw-pill--review">In review</span>
+              </div>
+            </a>
+          {% empty %}
+            <div class="npw-empty">No items in workflow.</div>
+          {% endfor %}
+        {% else %}
+          <div class="npw-empty">
+            Workflows not detected. This panel will automatically show review items once workflows are enabled.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
