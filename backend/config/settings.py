@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "apps.analytics",
     "apps.content",
     "apps.api",
+    "apps.newsroom_admin",
 
     "wagtail.contrib.forms",
     "wagtail.contrib.redirects",
@@ -154,7 +155,7 @@ SPECTACULAR_SETTINGS = {
 
 
 
-WAGTAIL_SITE_NAME = "News Portal"
+WAGTAIL_SITE_NAME = "The Nepal Wire"
 WAGTAILADMIN_BASE_URL = "http://localhost:8000"
 PUBLIC_BACKEND_BASE_URL = "http://localhost:8000"
 
